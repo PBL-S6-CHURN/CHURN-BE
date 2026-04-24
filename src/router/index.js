@@ -9,9 +9,13 @@ const { Controller } = require("../controller");
 // memanggil router
 const { customerRouter } = require("./CustomerRouter");
 const { userRouter } = require("./UserRouter");
+const { summarizeRouter } = require("./SummarizeRouter");
+const { alertRouter } = require("./AlertRouter");
 
 router.get("/", Controller.HomeController);
 router.use(customerRouter);
 router.use(userRouter);
+router.use(summarizeRouter);
+router.use(alertRouter);
 
 module.exports = { router };
