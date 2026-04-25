@@ -1,9 +1,11 @@
 "use strict";
 
 const { query } = require("../config");
-const webToken = require("jsonwebtoken");
 const { hasPassword, verifyPassword } = require("../helper/passEncrypt");
-const { generateAccessToken } = require("../helper/tokenManager");
+const { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken } = require("../helper/tokenManager");
+
+require('dotenv').config();
+const ms = require('ms');
 
 class UserModel {
     constructor(username, email) {
@@ -23,7 +25,7 @@ class UserModel {
                 return "user created";
             }
         } catch (error) {
-            console.log(error.message);
+            throw new Error(error.message);
         }
     }
 
@@ -33,26 +35,61 @@ class UserModel {
             const user = await this.FindUserModel(email);
 
             if (!user) {
-                return "user not found";
+                throw new Error("user not found");
             }
 
             const match = await verifyPassword(password, user.password);
 
             if (!match) {
-                return "wrong password";
+                throw new Error("wrong password");
             }
 
             const accessToken = generateAccessToken({ id: user.id });
-
+            const refreshToken = generateRefreshToken({ id: user.id });
+            const duration = ms(process.env.REFRESH_TOKEN_EXPIRATION) || "7d";
+            const expired = new Date(Date.now() + duration);
+            await this.saveRefreshToken(user.id, refreshToken, expired);
 
             return {
-                user: true,
-                match,
                 accessToken,
+                refreshToken,
                 message: "login success"
             }
         } catch (error) {
             console.log(error.message);
+        }
+    }
+
+    // save refresh token
+    static async saveRefreshToken(id, token, expired) {
+        const textQuery = `UPDATE users SET refresh_token = $1, refresh_token_expires_at = $2 WHERE id = $3;`;
+        try {
+            const result = await query(textQuery, [token, expired, id]);
+            return true;
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    // find user by refresh token
+    static async FindUserByRefreshToken(token) {
+        const textQuery = `SELECT * FROM users WHERE refresh_token = $1;`;
+        try {
+            const result = await query(textQuery, [token]);
+            return result.rows[0];
+        } catch (error) {
+            throw new Error(error.message);
+        }
+    }
+
+    // Delete refresh token
+    static async DeleteRefreshToken(token) {
+        const textQuery = `UPDATE users SET refresh_token = NULL, refresh_token_expires_at = NULL WHERE refresh_token = $1;`;
+        try {
+            const result = await query(textQuery, [token]);
+            return true;
+        } catch (error) {
+            throw new Error(error.message);
         }
     }
 

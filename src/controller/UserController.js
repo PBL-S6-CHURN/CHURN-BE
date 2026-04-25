@@ -25,17 +25,15 @@ class UserController {
 
     static async LoginController(req, res) {
         const { email, password } = req.body;
-
+        
         try {
             const result = await UserModel.LoginModel(email, password);
-            console.log(result);
-            if (result.user) {
-                res.status(200).json({
+            console.log("Hasil dari UserModel:", result);
+
+            if (result) {
+                return res.status(200).json({
                     status: "success",
-                    data: {
-                        message: result.message,
-                        accessToken: result.accessToken
-                    },
+                    data: result,
                 })
             }
 
@@ -47,6 +45,38 @@ class UserController {
         }
     }
 
+    static async RefreshTokenController(req, res) {
+        const { refreshToken } = req.body;
+
+        try {
+            // 1. Cari user berdasarkan refresh token di DB
+            const user = await UserModel.FindUserByRefreshToken(refreshToken);
+            if (!user) {
+                return res.status(403).json({ status: 'fail', message: 'Invalid refresh token' });
+            }
+
+            // 2. Verifikasi token secara JWT
+            const decoded = require('../helper/tokenManager').verifyRefreshToken(refreshToken);
+            if (!decoded) {
+                return res.status(403).json({ status: 'fail', message: 'Token expired or invalid' });
+            }
+
+            // 3. Generate Access Token baru
+            const newAccessToken = require('../helper/tokenManager').generateAccessToken({ id: user.id });
+
+            res.status(200).json({
+                status: "success",
+                data: {
+                    accessToken: newAccessToken
+                }
+            });
+        } catch (error) {
+            return res.status(400).json({ 
+                status: 'fail',
+                message: error.message 
+            });
+        }
+    }
     static async ProfileController(req, res) {
         const { user } = req;
         try {

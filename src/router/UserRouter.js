@@ -11,5 +11,6 @@ const { Auth } = require("../middleware/auth");
 userRouter.post("/register", UserController.RegisterController);
 userRouter.post("/login", UserController.LoginController);
 userRouter.get("/profile", Auth.authenticate, UserController.ProfileController);
+userRouter.post("/refresh-token", UserController.RefreshTokenController);
 
 module.exports = { userRouter };
