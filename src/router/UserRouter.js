@@ -12,5 +12,6 @@ userRouter.post("/register", UserController.RegisterController);
 userRouter.post("/login", UserController.LoginController);
 userRouter.get("/profile", Auth.authenticate, UserController.ProfileController);
 userRouter.post("/refresh-token", UserController.RefreshTokenController);
+userRouter.delete("/logout", UserController.LogoutController);
 
 module.exports = { userRouter };

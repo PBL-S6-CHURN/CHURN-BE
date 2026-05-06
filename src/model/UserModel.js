@@ -1,8 +1,10 @@
 "use strict";
 
 const { query } = require("../config");
+const { AuthenticationError } = require("../exceptions/AuthenticationError");
+const { NotFoundError } = require("../exceptions/NotFoundError");
 const { hasPassword, verifyPassword } = require("../helper/passEncrypt");
-const { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken } = require("../helper/tokenManager");
+const { generateAccessToken, generateRefreshToken } = require("../helper/tokenManager");
 
 require('dotenv').config();
 const ms = require('ms');
@@ -35,13 +37,13 @@ class UserModel {
             const user = await this.FindUserModel(email);
 
             if (!user) {
-                throw new Error("user not found");
+                throw new NotFoundError("Kredensial yang anda berikan salah");
             }
 
             const match = await verifyPassword(password, user.password);
 
             if (!match) {
-                throw new Error("wrong password");
+                throw new AuthenticationError("Kata sandi salah");
             }
 
             const accessToken = generateAccessToken({ id: user.id });
@@ -57,6 +59,7 @@ class UserModel {
             }
         } catch (error) {
             console.log(error.message);
+            throw error;
         }
     }
 

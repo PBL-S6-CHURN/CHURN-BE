@@ -1,12 +1,16 @@
 "use strict";
 
+// import file
 const { UserModel } = require("../model/UserModel");
+const { UserValidator } = require("../validator/users");
+const { ClientError } = require('../exceptions/ClientError');
 
 class UserController {
     static async RegisterController(req, res) {
-        const { username, email, password } = req.body;
-
         try {
+            UserValidator.validateRegisterPayload(req.body);
+            const { username, email, password } = req.body;
+
             const result = await UserModel.RegisterModel(username, email, password);
             
             res.status(201).json({
@@ -16,19 +20,29 @@ class UserController {
                 },
             })
         } catch (error) {
-            return res.status(400).json({ 
-                status: 'fail',
-                message: error.message 
+            // Cek apakah ini error yang kita buat sendiri (400/401)
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({
+                    status: 'fail',
+                    message: error.message,
+                });
+            }
+
+            // Jika bukan (misal error database/server crash), kirim status 500
+            console.error(error); // Tetap log untuk internal
+            return res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kegagalan pada server kami',
             });
         }
     }
 
-    static async LoginController(req, res) {
-        const { email, password } = req.body;
-        
+    static async LoginController(req, res) {        
         try {
+            UserValidator.validateLoginPayload(req.body);
+            const { email, password } = req.body;
+
             const result = await UserModel.LoginModel(email, password);
-            console.log("Hasil dari UserModel:", result);
 
             if (result) {
                 return res.status(200).json({
@@ -38,9 +52,19 @@ class UserController {
             }
 
         } catch (error) {
-            return res.status(400).json({ 
-                status: 'fail',
-                message: error.message 
+            // Cek apakah ini error yang kita buat sendiri (400/401)
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({
+                    status: 'fail',
+                    message: error.message,
+                });
+            }
+
+            // Jika bukan (misal error database/server crash), kirim status 500
+            console.error(error); // Tetap log untuk internal
+            return res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kegagalan pada server kami',
             });
         }
     }
@@ -49,7 +73,6 @@ class UserController {
         const { refreshToken } = req.body;
 
         try {
-            // 1. Cari user berdasarkan refresh token di DB
             const user = await UserModel.FindUserByRefreshToken(refreshToken);
             if (!user) {
                 return res.status(403).json({ status: 'fail', message: 'Invalid refresh token' });
@@ -61,7 +84,6 @@ class UserController {
                 return res.status(403).json({ status: 'fail', message: 'Token expired or invalid' });
             }
 
-            // 3. Generate Access Token baru
             const newAccessToken = require('../helper/tokenManager').generateAccessToken({ id: user.id });
 
             res.status(200).json({
@@ -71,9 +93,19 @@ class UserController {
                 }
             });
         } catch (error) {
-            return res.status(400).json({ 
-                status: 'fail',
-                message: error.message 
+            // Cek apakah ini error yang kita buat sendiri (400/401)
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({
+                    status: 'fail',
+                    message: error.message,
+                });
+            }
+
+            // Jika bukan (misal error database/server crash), kirim status 500
+            console.error(error); // Tetap log untuk internal
+            return res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kegagalan pada server kami',
             });
         }
     }
@@ -89,9 +121,43 @@ class UserController {
                 },
             })
         } catch (error) {
-            return res.status(400).json({ 
-                status: 'fail',
-                message: error.message 
+            // Cek apakah ini error yang kita buat sendiri (400/401)
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({
+                    status: 'fail',
+                    message: error.message,
+                });
+            }
+
+            // Jika bukan (misal error database/server crash), kirim status 500
+            console.error(error); // Tetap log untuk internal
+            return res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kegagalan pada server kami',
+            });
+        }
+    }
+
+    static async LogoutController(req, res) {
+        const { refreshToken } = req.body;
+
+        try {
+            await UserModel.DeleteRefreshToken(refreshToken);
+            res.status(200).json({ status: "success", message: "Logout success" });
+        } catch (error) {
+            // Cek apakah ini error yang kita buat sendiri (400/401)
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({
+                    status: 'fail',
+                    message: error.message,
+                });
+            }
+
+            // Jika bukan (misal error database/server crash), kirim status 500
+            console.error(error); // Tetap log untuk internal
+            return res.status(500).json({
+                status: 'error',
+                message: 'Terjadi kegagalan pada server kami',
             });
         }
     }
