@@ -6,9 +6,12 @@ const mutler = require('multer');
 const upload = mutler({storage: mutler.memoryStorage()});
 
 // memanggil controller
+const { Auth } = require("../middleware/auth");
 const { CustomerController } = require("../controller/CustomerController");
 
 // list router
+// customerRouter.use(Auth.authenticate);
+customerRouter.use(Auth.authenticate);
 customerRouter.get("/customers", CustomerController.CustomerGetController);
 customerRouter.get("/customers/search", CustomerController.CustomerSearchController);
 customerRouter.get("/customers/stats", CustomerController.StatsCustomerController);

@@ -13,8 +13,8 @@ const { summarizeRouter } = require("./SummarizeRouter");
 const { alertRouter } = require("./AlertRouter");
 
 router.get("/", Controller.HomeController);
-router.use(customerRouter);
 router.use(userRouter);
+router.use(customerRouter);
 router.use(summarizeRouter);
 router.use(alertRouter);
 
