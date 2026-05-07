@@ -53,9 +53,25 @@ class CustomerController {
     static async CustomerTypeController(req, res) {
         try {
             const { type } = req.params;
-            res.send(`Lihat Customer : ${type}`);
+            const { page, limit } = req.query;
+
+            const data = await CustomerModel.FilterCustomerTypeModel(type, page, limit);
+            res.status(200).json({
+                status: "success",
+                metadata: {
+                    total_data: data.totalData,
+                    total_pages: data.totalPages,
+                    current_page: data.currentPage,
+                    page_size: limit
+                },
+                data: data.customers
+            });
         } catch (error) {
             console.log(error);
+            res.status(500).json({
+                status: "error",
+                message: error.message,
+            })
         }
     }
 
@@ -179,6 +195,24 @@ class CustomerController {
             }
             console.error(error);
             res.status(500).json({ status: 'error', message: 'Gagal memproses file excel' });
+        }
+    }
+
+    static async StatsCustomerController(req, res) {
+        try {
+            const data = await CustomerModel.StatsCustomerByTypeModel();
+            res.status(200).json({
+                status: "success",
+                data: {
+                    message: data,
+                },
+            });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({
+                status: "error",
+                message: error.message,
+            })
         }
     }
 }

@@ -123,6 +123,31 @@ class CustomerModel {
 
     // filter customer by risk
     // filter customer by type
+    static async FilterCustomerTypeModel(type, page=1, limit=5) {
+        try {
+            const offset = (page - 1) * limit;
+            const dataQuery = `
+                ${this.#baseQuery} 
+                WHERE p.plan_name ILIKE $1 ORDER BY cu.customer_id ASC 
+                LIMIT $2 OFFSET $3
+            `;
+            const countQuery = `SELECT COUNT(*) FROM customers`;
+            const [dataRes, countRes] = await Promise.all([
+                query(dataQuery, [type, limit, offset]),
+                query(countQuery)
+            ]);
+            return {
+                customers: dataRes.rows,
+                totalData: parseInt(countRes.rows[0].count),
+                totalPages: Math.ceil(countRes.rows[0].count / limit),
+                currentPage: parseInt(page)
+            };
+        } catch (error) {
+            console.error("Error [FilterCustomerTypeModel]:", error.message);
+            throw error;
+        }
+    }
+
     // search customer by customer_id
     static async SearchCustomerbyCustomerIdModel(cId, page=1, limit=5) {
         try {
@@ -131,7 +156,7 @@ class CustomerModel {
             // Query untuk ambil data dengan LIMIT dan OFFSET
             const dataQuery = `
                 ${this.#baseQuery} 
-                WHERE cu.customer_id ILIKE $1 ORDER BY cu.customer_id ASC 
+                WHERE cu ILIKE $1 ORDER BY cu.customer_id ASC 
                 LIMIT $2 OFFSET $3
             `;
             
@@ -152,6 +177,25 @@ class CustomerModel {
         } catch (error) {
             if (error instanceof NotFoundError) throw error;
             console.log(`Error [SearchCustomerbyCustomerIdModel]: ${error.message}`);
+        }
+    }
+
+    // stats customer by type
+    static async StatsCustomerByTypeModel() {
+        const textQuery = `SELECT 
+                p.plan_name, 
+                COUNT(cu.customer_id) AS total_customers
+            FROM plans p
+            LEFT JOIN customers cu ON p.id = cu.plan_id
+            GROUP BY p.id, p.plan_name
+            ORDER BY total_customers DESC;
+        `;
+
+        try {
+            const result = await query(textQuery);
+            return result.rows;
+        } catch (error) {
+            console.log(`Error [StatsCustomerByTypeModel]: ${error.message}`);
         }
     }
 }

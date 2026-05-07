@@ -30,10 +30,11 @@ npm run db:setup
 
 ```
 GET    /customers                        - Get all customers
-GET    /customers/:id                    - Get customers by ID
 GET    /customers/type/:type             - Get customers by type
 GET    /customers/risk/:risk             - Get customers by risk
+GET    /customers/stats                  - Get stats by type
 GET    /customers/search                 - Search customers by name
+GET    /customers/:id                    - Get customers by ID
 POST   /customers                        - Add data customers
 POST   /customers/upload                 - Add data customers by upload excell
 ```

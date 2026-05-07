@@ -11,8 +11,9 @@ const { CustomerController } = require("../controller/CustomerController");
 // list router
 customerRouter.get("/customers", CustomerController.CustomerGetController);
 customerRouter.get("/customers/search", CustomerController.CustomerSearchController);
-customerRouter.get("/customers/:id", CustomerController.CustomerDetailController);
+customerRouter.get("/customers/stats", CustomerController.StatsCustomerController);
 customerRouter.get("/customers/type/:type", CustomerController.CustomerTypeController);
+customerRouter.get("/customers/:id", CustomerController.CustomerDetailController);
 customerRouter.post("/customers", CustomerController.CustomerAddController);
 customerRouter.post("/customers/upload", upload.single('file'), CustomerController.CustomerUploadFile);
 
