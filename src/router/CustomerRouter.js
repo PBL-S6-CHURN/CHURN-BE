@@ -20,4 +20,7 @@ customerRouter.get("/customers/:id", CustomerController.CustomerDetailController
 customerRouter.post("/customers", CustomerController.CustomerAddController);
 customerRouter.post("/customers/upload", upload.single('file'), CustomerController.CustomerUploadFile);
 
+// Tambahkan predict
+customerRouter.post('/predict', CustomerController.PredictManual);
+
 module.exports = { customerRouter };

@@ -2,6 +2,8 @@
 
 const { query } = require("../config");
 const { NotFoundError } = require("../exceptions/NotFoundError");
+const { spawn } = require('child_process');
+const path = require('path');
 
 require('dotenv').config();
 
@@ -197,6 +199,36 @@ class CustomerModel {
         } catch (error) {
             console.log(`Error [StatsCustomerByTypeModel]: ${error.message}`);
         }
+    }
+
+    // Predict Manual
+    static async PredictManualModel(inputData) {
+        return new Promise((resolve, reject) => {
+            // Sesuaikan path ke file predict.py
+            const scriptPath = path.join(__dirname, '../../ml_models/predict.py');
+            
+            const pythonProcess = spawn('python', [scriptPath]);
+
+            pythonProcess.stdin.write(JSON.stringify(inputData));
+            pythonProcess.stdin.end();
+
+            let output = "";
+            let errorOutput = "";
+
+            pythonProcess.stdout.on('data', (data) => output += data.toString());
+            pythonProcess.stderr.on('data', (data) => errorOutput += data.toString());
+
+            pythonProcess.on('close', (code) => {
+                if (code !== 0) {
+                    return reject(new Error(errorOutput || "Python process exited with error"));
+                }
+                try {
+                    resolve(JSON.parse(output));
+                } catch (e) {
+                    reject(new Error("Gagal parsing output AI"));
+                }
+            });
+        });
     }
 }
 

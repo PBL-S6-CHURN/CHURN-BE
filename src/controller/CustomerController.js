@@ -1,6 +1,7 @@
 "use strict";
 
 const { ClientError } = require("../exceptions/ClientError");
+const { CustomerPredict } = require("../helper/predict");
 const { CustomerModel } = require("../model/CustomerModel");
 const { CustomerValidator } = require("../validator/customers");
 const xlsx = require('xlsx');
@@ -12,6 +13,12 @@ class CustomerController {
             const { page = 1, limit = 5 } = req.query;
 
             const data = await CustomerModel.ShowAllCustomersModel(page, limit);
+            const customers = data.customers;
+
+            const resultPredict = await Promise.all(
+                customers.map(customer => CustomerPredict(customer))
+            );
+            
             res.status(200).json({
                 status: "success",
                 metadata: {
@@ -20,7 +27,7 @@ class CustomerController {
                     current_page: data.currentPage,
                     page_size: limit
                 },
-                data: data.customers
+                data: resultPredict
             });
         } catch (error) {
             console.log(error);
@@ -201,6 +208,27 @@ class CustomerController {
     static async StatsCustomerController(req, res) {
         try {
             const data = await CustomerModel.StatsCustomerByTypeModel();
+            res.status(200).json({
+                status: "success",
+                data: {
+                    message: data,
+                },
+            });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({
+                status: "error",
+                message: error.message,
+            })
+        }
+    }
+
+    // coba predict manual
+    static async PredictManual(req, res) {
+        try {
+            const inputData = req.body;
+            const data = await CustomerModel.PredictManualModel(inputData);
+
             res.status(200).json({
                 status: "success",
                 data: {
