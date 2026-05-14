@@ -35,7 +35,7 @@ exports.up = (pgm) => {
             type: "float",
             default: 0
         },
-        support_ticket_count: {
+        support_ticket_last_90d: {
             type: "int",
             default: 0
         },

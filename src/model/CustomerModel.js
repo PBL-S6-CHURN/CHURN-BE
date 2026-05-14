@@ -15,10 +15,12 @@ class CustomerModel {
             SELECT 
                 cu.customer_id, 
                 p.plan_name, 
-                co.contract_name, 
+                co.contract_name,
+                cu.monthly_revenue,
                 cu.last_login_days_ago, 
-                cu.feature_adoption_pct, 
-                cu.support_ticket_count, 
+                cu.feature_adoption_pct,
+                cu.total_users, 
+                cu.support_ticket_last_90d, 
                 cu.tenure_months, 
                 cu.monthly_usage_hrs, 
                 cu.nps_score, 
@@ -184,13 +186,18 @@ class CustomerModel {
 
     // stats customer by type
     static async StatsCustomerByTypeModel() {
-        const textQuery = `SELECT 
+        const textQuery = `
+            SELECT 
                 p.plan_name, 
-                COUNT(cu.customer_id) AS total_customers
-            FROM plans p
-            LEFT JOIN customers cu ON p.id = cu.plan_id
-            GROUP BY p.id, p.plan_name
-            ORDER BY total_customers DESC;
+                COUNT(c.id) AS total_count,
+                ROUND(
+                    (COUNT(c.id) * 100.0 / (SELECT COUNT(*) FROM customers)), 
+                    2
+                ) AS percentage
+            FROM customers c
+            JOIN plans p ON c.plan_id = p.id
+            GROUP BY p.plan_name
+            ORDER BY total_count DESC;
         `;
 
         try {

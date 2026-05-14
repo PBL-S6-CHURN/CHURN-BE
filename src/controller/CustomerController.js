@@ -15,9 +15,11 @@ class CustomerController {
             const data = await CustomerModel.ShowAllCustomersModel(page, limit);
             const customers = data.customers;
 
+            /*
             const resultPredict = await Promise.all(
                 customers.map(customer => CustomerPredict(customer))
             );
+            */
             
             res.status(200).json({
                 status: "success",
@@ -27,7 +29,7 @@ class CustomerController {
                     current_page: data.currentPage,
                     page_size: limit
                 },
-                data: resultPredict
+                data: customers
             });
         } catch (error) {
             console.log(error);
