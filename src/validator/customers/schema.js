@@ -14,6 +14,10 @@ const CustomerPayloadSchema = {
             'string.empty': 'contract_id tidak boleh kosong',
             'any.required': 'contract_id harus diisi'
         }),
+        monthly_revenue: Joi.number().required().messages({
+            'string.empty': 'monthly_revenue tidak boleh kosong',
+            'any.required': 'monthly_revenue harus diisi'
+        }),
         last_login_days_ago: Joi.number().integer().required().messages({
             'string.empty': 'last_login_days_ago tidak boleh kosong',
             'any.required': 'last_login_days_ago harus diisi'
@@ -22,7 +26,7 @@ const CustomerPayloadSchema = {
             'string.empty': 'feature_adoption_pct tidak boleh kosong',
             'any.required': 'feature_adoption_pct harus diisi'
         }),
-        support_ticket_count: Joi.number().integer().required().messages({
+        support_ticket_last_90d: Joi.number().integer().required().messages({
             'string.empty': 'support_ticket_count tidak boleh kosong',
             'any.required': 'support_ticket_count harus diisi'
         }),
@@ -42,6 +46,10 @@ const CustomerPayloadSchema = {
             'string.empty': 'payment_delay_count tidak boleh kosong',
             'any.required': 'payment_delay_count harus diisi'
         }),
+        total_users: Joi.number().integer().required().messages({
+            'string.empty': 'total_users tidak boleh kosong',
+            'any.required': 'total_users harus diisi'
+        }),
 
     }),
 
@@ -50,6 +58,8 @@ const CustomerPayloadSchema = {
             'string.empty': 'customer_id tidak boleh kosong',
             'any.required': 'customer_id harus diisi'
         }),
+        page: Joi.number().integer().min(1).optional(),
+        limit: Joi.number().integer().min(1).optional()
     }),
 }
 

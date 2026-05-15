@@ -88,9 +88,9 @@ class CustomerController {
         try {
             CustomerValidator.validateSearchPayload(req.query);
 
-            const { name, page = 1, limit = 5 } = req.query;
+            const { customer_id, page = 1, limit = 5 } = req.query;
 
-            const data = await CustomerModel.SearchCustomerbyCustomerIdModel(name, page, limit);
+            const data = await CustomerModel.SearchCustomerbyCustomerIdModel(customer_id, page, limit);
             res.status(200).json({
                 status: "success",
                 metadata: {
@@ -122,8 +122,8 @@ class CustomerController {
     static async CustomerAddController(req, res) {
         try {
             CustomerValidator.validateAddPayload(req.body);
-            const {customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_count, nps_score, tenure_months, last_login_days_ago} = req.body;
-            const data = await CustomerModel.AddCustomerModel(customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_count, nps_score, tenure_months, last_login_days_ago);
+            const {customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users} = req.body;
+            const data = await CustomerModel.AddCustomerModel(customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users);
             res.status(200).json({
                 status: "success",
                 data: {
@@ -179,10 +179,12 @@ class CustomerController {
                     monthly_usage_hrs: parseFloat(row.monthly_usage_hrs),
                     feature_adoption_pct: parseFloat(row.feature_adoption_pct),
                     payment_delay_count: parseInt(row.payment_delay_count),
-                    support_ticket_count: parseInt(row.support_tickets_count), // Perhatikan ada huruf 's' di file kamu
+                    support_ticket_last_90d: parseInt(row.support_tickets_last_90d),
                     nps_score: parseInt(row.nps_score),
                     tenure_months: parseInt(row.tenure_months),
-                    last_login_days_ago: parseInt(row.last_login_days_ago)
+                    last_login_days_ago: parseInt(row.last_login_days_ago),
+                    monthly_revenue: parseFloat(row.monthly_revenue),
+                    total_users: parseInt(row.total_users)
                 };
             });
 

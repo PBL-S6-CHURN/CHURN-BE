@@ -12,7 +12,8 @@ class CustomerModel {
     // root query
     static get #baseQuery() {
         return `
-            SELECT 
+            SELECT
+                cu.id,
                 cu.customer_id, 
                 p.plan_name, 
                 co.contract_name,
@@ -78,10 +79,10 @@ class CustomerModel {
     }
 
     // add customer
-    static async AddCustomerModel(cId, planId, contractId, lastLoginDaysAgo, featureAdoptionPct, supportTicketCount, tenureMonths, monthlyUsageHrs, npsScore, paymentDelayCount) {
+    static async AddCustomerModel(customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users) {
         try {
-            const textQuery = `INSERT INTO customers (customer_id, plan_id, contract_id, last_login_days_ago, feature_adoption_pct, support_ticket_count, tenure_months, monthly_usage_hrs, nps_score, payment_delay_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`;
-            const result = await query(textQuery, [cId, planId, contractId, lastLoginDaysAgo, featureAdoptionPct, supportTicketCount, tenureMonths, monthlyUsageHrs, npsScore, paymentDelayCount]); 
+            const textQuery = `INSERT INTO customers (customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`;
+            const result = await query(textQuery, [customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users]); 
             return result.rows[0];
         } catch (error) {
             console.log(`Error [AddCustomerModel]: ${error.message}`);
@@ -95,24 +96,21 @@ class CustomerModel {
 
             for (const data of datas) {
                 const textQuery = `
-                    INSERT INTO customers (
-                        customer_id, plan_id, contract_id, last_login_days_ago, 
-                        feature_adoption_pct, support_ticket_count, tenure_months, 
-                        monthly_usage_hrs, nps_score, payment_delay_count
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
-                    RETURNING customer_id;
+                    INSERT INTO customers (customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING customer_id;
                 `;
                 const values = [
                     data.customer_id,
                     data.plan_id,
                     data.contract_id,
-                    data.last_login_days_ago,
-                    data.feature_adoption_pct,
-                    data.support_ticket_count,
-                    data.tenure_months,
                     data.monthly_usage_hrs,
+                    data.feature_adoption_pct,
+                    data.payment_delay_count,
+                    data.support_ticket_last_90d,
                     data.nps_score,
-                    data.payment_delay_count
+                    data.tenure_months,
+                    data.last_login_days_ago,
+                    data.monthly_revenue,
+                    data.total_users
                 ];
                 const res = await query(textQuery, values);
                 result.push(res.rows[0]); 
@@ -156,20 +154,21 @@ class CustomerModel {
     static async SearchCustomerbyCustomerIdModel(cId, page=1, limit=5) {
         try {
             const offset = (page - 1) * limit;
+            const searchPattern = `%${cId}%`;
         
             // Query untuk ambil data dengan LIMIT dan OFFSET
             const dataQuery = `
                 ${this.#baseQuery} 
-                WHERE cu ILIKE $1 ORDER BY cu.customer_id ASC 
+                WHERE cu.customer_id ILIKE $1 ORDER BY cu.customer_id ASC 
                 LIMIT $2 OFFSET $3
             `;
             
             // Query untuk hitung total record (penting untuk pagination)
-            const countQuery = `SELECT COUNT(*) FROM customers`;
+            const countQuery = `SELECT COUNT(*) FROM customers cu WHERE cu.customer_id ILIKE $1`;
     
             const [dataRes, countRes] = await Promise.all([
-                query(dataQuery, [`%${cId}%`,limit, offset]),
-                query(countQuery)
+                query(dataQuery, [searchPattern,limit, offset]),
+                query(countQuery, [searchPattern])
             ]);
     
             return {
