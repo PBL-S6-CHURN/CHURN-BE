@@ -47,6 +47,14 @@ POST    /login         - Login account
 GET     /profile       - Check profile
 ```
 
+### **Summarize Management**
+
+```
+GET    /summarize               - Get all data summarize data 
+GET    /summarize/ratings       - Get positive & negative ratings
+GET    /summarize/sentiment     - Just get summarize data
+```
+
 ### **ALERT Management**
 
 ```
