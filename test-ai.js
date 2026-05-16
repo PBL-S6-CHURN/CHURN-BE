@@ -1,7 +1,7 @@
 // Di dalam file test-ai.js atau Controller
 const path = require('path');
 const { spawn } = require('child_process');
-const scriptPath = path.join(__dirname, 'ml_models', 'predict.py');
+const scriptPath = path.join(__dirname, 'ml_models', 'churn_prediction', 'predict.py');
 
 // 1. Data contoh (sesuaikan dengan kolom di file excel kamu)
 const manualInput = {

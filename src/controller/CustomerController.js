@@ -1,7 +1,7 @@
 "use strict";
 
 const { ClientError } = require("../exceptions/ClientError");
-const { CustomerPredict } = require("../helper/predict");
+const { CustomerPredict } = require("../helper/churnPredict");
 const { CustomerModel } = require("../model/CustomerModel");
 const { CustomerValidator } = require("../validator/customers");
 const xlsx = require('xlsx');

@@ -1,14 +1,16 @@
-"use strict";
+'use strict';
 
-const express = require("express");
-const summarizeRouter = express.Router();
+const express = require('express');
+const router  = express.Router();
+const { SummarizeController } = require('../controller/SummarizeController');
 
-// memanggil controller
-const { SummarizeController } = require("../controller/SummarizeController");
+// GET /summarize          → semua data (percentage + summary + top5)
+router.get('/', SummarizeController.SummarizeGetController);
 
-// list router
-summarizeRouter.get("/summarize", SummarizeController.SummarizeGetController);
-summarizeRouter.get("/summarize/sentiment", SummarizeController.SummarizeSentimentController);
-summarizeRouter.get("/summarize/ratings", SummarizeController.SummarizeGetRatingslController);
+// GET /summarize/ratings  → hanya percentage Positif & Negatif
+router.get('/ratings', SummarizeController.SummarizeGetRatingsController);
 
-module.exports = { summarizeRouter };
+// GET /summarize/sentiment → hanya paragraf summary Positif & Negatif
+router.get('/sentiment', SummarizeController.SummarizeSentimentController);
+
+module.exports = { summarizeRouter: router };

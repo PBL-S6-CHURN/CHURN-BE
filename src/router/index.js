@@ -15,7 +15,7 @@ const { alertRouter } = require("./AlertRouter");
 router.get("/", Controller.HomeController);
 router.use(userRouter);
 router.use(customerRouter);
-router.use(summarizeRouter);
+router.use('/summarize', summarizeRouter);
 router.use(alertRouter);
 
-module.exports = { router };
+module.exports = { router }; 

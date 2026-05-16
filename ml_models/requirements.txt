@@ -1,3 +1,9 @@
+# Library untuk Backend Data & Churn Prediction
+numpy
 pandas
 scikit-learn
 joblib
+
+# Library untuk NLP (Sentiment Analysis)
+tensorflow==2.18.0
+tf-keras==2.18.0
