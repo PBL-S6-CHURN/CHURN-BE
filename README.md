@@ -42,9 +42,12 @@ POST   /customers/upload                 - Add data customers by upload excell
 ### **Auth Management**
 
 ```
-POST    /register      - Register account
-POST    /login         - Login account
-GET     /profile       - Check profile
+POST    /register           - Register account
+POST    /login              - Login account
+GET     /profile            - Check profile
+DELETE  /logout             - Logout account
+PUT     /update-profile     - Update profile
+PUT     /change-password    - Update password
 ```
 
 ### **Summarize Management**

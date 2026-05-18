@@ -98,9 +98,14 @@ class UserModel {
 
     // show profile
     static async ProfileModel(id) {
-        const textQuery = `SELECT username, email FROM users WHERE id = $1`;
+        const textQuery = `SELECT username, email, profile_image, password FROM users WHERE id = $1`;
         try {
             const result = await query(textQuery, [id]);
+            
+            if (!result || result.rows.length === 0) {
+                return null;
+            }
+            
             return result.rows[0];
         } catch (error) {
             console.log(error.message);
@@ -112,6 +117,44 @@ class UserModel {
         const textQuery = `SELECT * FROM users WHERE email = $1`;
         try {
             const result = await query(textQuery, [email]);
+            return result.rows[0];
+        } catch (error) {
+            console.log(error.message);
+        }
+    }
+
+    // update profile
+    static async UpdateProfileModel(id, email, username, picture = null) {
+        const checkEmail = await this.FindUserModel(email);
+
+        if(checkEmail && checkEmail.id !== id) {
+            throw new Error("Email sudah digunakan oleh akun lain");
+        }
+
+        let textQuery = "";
+        let values = [];
+
+        if(picture) {
+            textQuery = `UPDATE users SET email = $1, username = $2, profile_image = $3 WHERE id = $4 RETURNING *;`;
+            values = [email, username, picture, id];
+        } else {
+            textQuery = `UPDATE users SET email = $1, username = $2 WHERE id = $3 RETURNING *;`;
+            values = [email, username, id];
+        }
+
+        try {
+            const result = await query(textQuery, values);
+            return result.rows[0];
+        } catch (error) {
+            console.log(error.message);
+        }
+    }
+
+    // ganti pw
+    static async UpdatePassword(id, hashPw) {
+        const textQuery = `UPDATE users SET password = $1 WHERE id = $2 RETURNING *;`;
+        try {
+            const result = await query(textQuery, [hashPw, id]);
             return result.rows[0];
         } catch (error) {
             console.log(error.message);
