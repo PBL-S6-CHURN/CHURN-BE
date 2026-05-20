@@ -61,7 +61,11 @@ GET    /summarize/sentiment     - Just get summarize data
 ### **ALERT Management**
 
 ```
-Please check the ALERT_API_DOCS.md files
+GET     /alerts                             - Get all alerts data
+GET     /alerts/plan/:plan                  - Get all alerts data by plan type
+GET     /alerts/:id                         - Get alerts data by ID
+PATCH   /alerts/:id/resolved                - Resolved alerts data by ID
+GET     /alerts/stats                       - Get stats alerts data
 ```
 
 ## 📦 **Scripts**

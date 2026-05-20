@@ -25,12 +25,29 @@ class CustomerModel {
                 cu.tenure_months, 
                 cu.monthly_usage_hrs, 
                 cu.nps_score, 
-                cu.payment_delay_count 
+                cu.payment_delay_count,
+                p_pred.risk,         
+                p_pred.score,        
+                p_pred.risk_score,   
+                p_pred.cause,        
+                p_pred.solution     
             FROM customers cu 
             INNER JOIN plans p ON cu.plan_id = p.id 
             INNER JOIN contracts co ON cu.contract_id = co.id
+            LEFT JOIN predicts p_pred ON cu.id = p_pred.customer_id
         `;
     };
+
+    static async GetCustomerByStringIdModel(customerIdString) {
+        try {
+            const textQuery = `SELECT id FROM customers WHERE customer_id = $1`;
+            const result = await query(textQuery, [customerIdString]);
+            return result.rows[0]; // Mengembalikan { id: <angka> } atau undefined jika tidak ketemu
+        } catch (error) {
+            console.log(`Error [GetCustomerByStringIdModel]: ${error.message}`);
+            throw error;
+        }
+    }
 
     // show all customers
     static async ShowAllCustomersModel(page=1, limit=5) {
@@ -124,6 +141,30 @@ class CustomerModel {
     }
 
     // filter customer by risk
+    static async FilterCustomerRiskModel(risk, page=1, limit=5) {
+        try {
+            const offset = (page - 1) * limit;
+            const dataQuery = `
+                ${this.#baseQuery} 
+                WHERE p_pred.risk ILIKE $1 ORDER BY cu.customer_id ASC 
+                LIMIT $2 OFFSET $3
+            `;
+            const countQuery = `SELECT COUNT(*) FROM customers`;
+            const [dataRes, countRes] = await Promise.all([
+                query(dataQuery, [risk, limit, offset]),
+                query(countQuery)
+            ]);
+            return {
+                customers: dataRes.rows,
+                totalData: parseInt(countRes.rows[0].count),
+                totalPages: Math.ceil(countRes.rows[0].count / limit),
+                currentPage: parseInt(page)
+            };
+        } catch (error) {
+            console.error("Error [FilterCustomerRiskModel]:", error.message);
+            throw error;
+        }
+    }
     // filter customer by type
     static async FilterCustomerTypeModel(type, page=1, limit=5) {
         try {
@@ -210,29 +251,42 @@ class CustomerModel {
     // Predict Manual
     static async PredictManualModel(inputData) {
         return new Promise((resolve, reject) => {
-            // Sesuaikan path ke file predict.py
-            const scriptPath = path.join(__dirname, '../../ml_models/predict.py');
+            const { spawn } = require('child_process');
+            const path = require('path');
             
+            const scriptPath = path.join(__dirname, '../../ml_models/churn_prediction/predict.py');
             const pythonProcess = spawn('python', [scriptPath]);
-
-            pythonProcess.stdin.write(JSON.stringify(inputData));
-            pythonProcess.stdin.end();
 
             let output = "";
             let errorOutput = "";
 
-            pythonProcess.stdout.on('data', (data) => output += data.toString());
-            pythonProcess.stderr.on('data', (data) => errorOutput += data.toString());
+            pythonProcess.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+            
+            pythonProcess.stderr.on('data', (data) => {
+                errorOutput += data.toString();
+            });
+
+            // Kirim data JSON ke Python
+            pythonProcess.stdin.write(JSON.stringify(inputData));
+            pythonProcess.stdin.end();
 
             pythonProcess.on('close', (code) => {
-                if (code !== 0) {
-                    return reject(new Error(errorOutput || "Python process exited with error"));
+                const cleanOutput = output.trim();
+                const cleanError = errorOutput.trim();
+
+                if (cleanOutput) {
+                    try {
+                        const parsedData = JSON.parse(cleanOutput);
+                        return resolve(parsedData); // Mengembalikan objek JSON sukses/error buatan python
+                    } catch (e) {
+                        return reject(new Error(`Python mengembalikan teks non-JSON: ${cleanOutput}`));
+                    }
                 }
-                try {
-                    resolve(JSON.parse(output));
-                } catch (e) {
-                    reject(new Error("Gagal parsing output AI"));
-                }
+                
+                // Jika masih kosong melompong (crash level Windows/Environment)
+                reject(new Error(`Python Crash seketika (Code ${code}). Log Windows: ${cleanError || 'Library pandas/joblib belum terinstal di terminal Windows Anda. Silakan jalankan: pip install pandas joblib scikit-learn'}`));
             });
         });
     }
