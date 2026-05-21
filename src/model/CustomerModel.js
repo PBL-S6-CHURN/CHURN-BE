@@ -38,6 +38,7 @@ class CustomerModel {
         `;
     };
 
+    // get customer by string id
     static async GetCustomerByStringIdModel(customerIdString) {
         try {
             const textQuery = `SELECT id FROM customers WHERE customer_id = $1`;
@@ -45,6 +46,19 @@ class CustomerModel {
             return result.rows[0]; // Mengembalikan { id: <angka> } atau undefined jika tidak ketemu
         } catch (error) {
             console.log(`Error [GetCustomerByStringIdModel]: ${error.message}`);
+            throw error;
+        }
+    }
+
+    // show all customers without pagination
+    static async GetAllCustomersModel() {
+        try {
+            // Mengambil seluruh data customer untuk di-loop oleh AI
+            const textQuery = `SELECT * FROM customers ORDER BY id ASC`;
+            const result = await query(textQuery);
+            return result.rows;
+        } catch (error) {
+            console.error("Error [GetAllCustomersModel]:", error.message);
             throw error;
         }
     }
@@ -245,6 +259,67 @@ class CustomerModel {
             return result.rows;
         } catch (error) {
             console.log(`Error [StatsCustomerByTypeModel]: ${error.message}`);
+        }
+    }
+
+    // stats customer by churn
+    static async StatsCustomerByChurnModel() {
+        try {
+            const textQuery = `
+                SELECT 
+                    COUNT(CASE WHEN pr.score = 1 THEN 1 END) AS total_churn,
+                    COUNT(CASE WHEN pr.score = 0 THEN 1 END) AS total_not_churn,
+                    COUNT(cu.id) AS total_customer
+                FROM customers cu
+                LEFT JOIN predicts pr ON cu.id = pr.customer_id
+            `;
+            
+            const result = await query(textQuery);
+            const stats = result.rows[0];
+    
+            // Konversi string count dari PostgreSQL ke tipe data Number/Integer
+            const totalChurn = parseInt(stats.total_churn) || 0;
+            const totalNotChurn = parseInt(stats.total_not_churn) || 0;
+            const totalCustomer = parseInt(stats.total_customer) || 0;
+    
+            // Hitung persentase secara aman (menghindari pembagian dengan angka 0)
+            const churnPercentage = totalCustomer > 0 ? parseFloat(((totalChurn / totalCustomer) * 100).toFixed(2)) : 0;
+            const notChurnPercentage = totalCustomer > 0 ? parseFloat(((totalNotChurn / totalCustomer) * 100).toFixed(2)) : 0;
+    
+            return {
+                total_customer: totalCustomer,
+                summary: {
+                    churn: totalChurn,
+                    not_churn: totalNotChurn
+                },
+                percentage: {
+                    churn: `${churnPercentage}%`,
+                    not_churn: `${notChurnPercentage}%`
+                }
+            };
+        } catch (error) {
+            console.error("Error [GetChurnStatisticsModel]:", error.message);
+            throw error;
+        }
+    }
+
+    // stats customer by risk
+    static async GetStatsByRiskModel() {
+        try {
+            // Melakukan grouping berdasarkan kolom risk di tabel predicts
+            const textQuery = `
+                SELECT 
+                    COALESCE(p_pred.risk, 'UNKNOWN') as risk_level,
+                    COUNT(cu.id)::int as total_customer
+                FROM customers cu
+                LEFT JOIN predicts p_pred ON cu.id = p_pred.customer_id
+                GROUP BY p_pred.risk
+            `;
+            const result = await query(textQuery);
+            return result.rows;
+        } catch (error) {
+            console.error("Error [GetStatsByRiskModel]:", error.message);
+            throw error;
         }
     }
 

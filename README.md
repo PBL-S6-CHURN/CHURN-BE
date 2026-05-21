@@ -35,6 +35,8 @@ GET    /customers/risk/:risk             - Get customers by risk
 GET    /customers/stats                  - Get stats by type
 GET    /customers/search                 - Search customers by name
 GET    /customers/:id                    - Get customers by ID
+GET    /customers/stats/churn            - Get stats by churn
+GET    /customers/stats/churn            - Get Stream Data
 POST   /customers                        - Add data customers
 POST   /customers/upload                 - Add data customers by upload excell
 ```

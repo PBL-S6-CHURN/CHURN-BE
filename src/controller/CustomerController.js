@@ -9,364 +9,233 @@ const { AlertModel } = require("../model/AlertModel");
 const xlsx = require("xlsx");
 
 class CustomerController {
+
     static async CustomerGetController(req, res) {
         try {
-        // 1. Ambil data page dan limit seperti biasa
-        const { page = 1, limit = 5 } = req.query;
+            const { page = 1, limit = 5 } = req.query;
+            const data = await CustomerModel.ShowAllCustomersModel(page, limit);
+            const customers = data.customers;
 
-        // 2. Tarik data customer mentah dari database
-        const data = await CustomerModel.ShowAllCustomersModel(page, limit);
-        const customers = data.customers;
+            const resultPredict = customers.map((customer) => {
+                return {
+                    id: customer.id,
+                    customer_id: customer.customer_id,
+                    plan_id: customer.plan_id,
+                    contract_id: customer.contract_id,
+                    plan_name: customer.plan_name,          
+                    contract_name: customer.contract_name,
+                    last_login_days_ago: customer.last_login_days_ago,
+                    monthly_revenue: customer.monthly_revenue,
+                    feature_adoption_pct: customer.feature_adoption_pct,
+                    total_users: customer.total_users,
+                    support_ticket_last_90d: customer.support_ticket_last_90d,
+                    tenure_months: customer.tenure_months,
+                    monthly_usage_hrs: customer.monthly_usage_hrs,
+                    nps_score: customer.nps_score,
+                    payment_delay_count: customer.payment_delay_count,
+                    created_at: customer.created_at,
 
+                    prediction_results:
+                        customer.score !== null && customer.score !== undefined
+                            ? {
+                                score: customer.score,
+                                risk_score_pct: customer.risk_score,
+                                risk_level: customer.risk,
+                                churn_status: customer.score === 1 ? "YES" : "NO",
+                                churn_factors: customer.cause ? customer.cause.split("\n") : [],
+                                solutions: customer.solution ? customer.solution.split("\n") : [],
+                            }
+                            : null,
+                };
+            });
 
-        // 3. LOOPING & PREDIKSI LANGSUNG DI TEMPAT
-        for (const customer of customers) {
-            try {
-            // Bungkus data sesuai format yang diminta oleh helper Python (churnPredict)
-            const inputData = {
-                customer_id: customer.customer_id,
-                monthly_usage_hrs: parseFloat(customer.monthly_usage_hrs),
-                feature_adoption_pct: parseFloat(customer.feature_adoption_pct),
-                support_tickets_last_90d: parseInt(
-                customer.support_ticket_last_90d
-                ),
-                tenure_months: parseInt(customer.tenure_months),
-                nps_score: parseInt(customer.nps_score),
-                payment_delay_count: parseInt(customer.payment_delay_count),
-                plan_type: customer.plan_name,
-                contract_type: customer.contract_name,
-                monthly_revenue: parseFloat(customer.monthly_revenue),
-                total_users: parseInt(customer.total_users),
-                last_login_days_ago: parseInt(customer.last_login_days_ago),
-            };
+            return res.status(200).json({
+                status: "success",
+                metadata: {
+                    total_data: data.totalData,
+                    total_pages: data.totalPages,
+                    current_page: data.currentPage,
+                    page_size: parseInt(limit),
+                },
+                data: resultPredict,
+            });
 
-            // Panggil helper Python secara realtime
-            const result = await churnPredict(inputData);
-
-            await CustomerController.#executeLivePrediction(data.customers);
-                
-            if (result.status === "success") {
-                // Langsung simpan/update ke database tabel predicts
-                await PredictModel.SaveOrUpdatePredict(
-                customer.id,
-                result.risk_level,
-                result.score,
-                result.risk_score_pct,
-                result.churn_factors,
-                result.solutions
-                );
-                console.log(
-                `> Prediksi realtime SUKSES untuk: ${customer.customer_id}`
-                );
-            }
-            } catch (loopError) {
-            // Jika ada 1 customer bermasalah, loop tidak pecah dan tetap lanjut ke customer berikutnya
-            console.error(
-                `> Prediksi realtime GAGAL untuk ${customer.customer_id}:`,
-                loopError.message
-            );
-            }
-        }
-
-        console.log(
-            "[LIVE PREDICT] Looping prediksi selesai. Mengambil ulang data yang sudah terupdate..."
-        );
-
-        // 4. AMBIL ULANG DATA TERBARU
-        // Karena data di tabel predicts baru saja berubah/terisi setelah di-loop di atas,
-        // kita panggil sekali lagi agar data yang di-map ke response JSON tidak bernilai null!
-        const updatedData = await CustomerModel.ShowAllCustomersModel(
-            page,
-            limit
-        );
-        const updatedCustomers = updatedData.customers;
-
-        // 5. Mapping hasil akhir ke format JSON Response
-        const resultPredict = updatedCustomers.map((customer) => {
-            return {
-            id: customer.id,
-            customer_id: customer.customer_id,
-            plan_id: customer.plan_id,
-            contract_id: customer.contract_id,
-            last_login_days_ago: customer.last_login_days_ago,
-            feature_adoption_pct: customer.feature_adoption_pct,
-            support_ticket_last_90d: customer.support_ticket_last_90d,
-            tenure_months: customer.tenure_months,
-            monthly_usage_hrs: customer.monthly_usage_hrs,
-            nps_score: customer.nps_score,
-            payment_delay_count: customer.payment_delay_count,
-            created_at: customer.created_at,
-
-            prediction_results:
-                customer.score !== null && customer.score !== undefined
-                ? {
-                    score: customer.score,
-                    risk_score_pct: customer.risk_score,
-                    risk_level: customer.risk,
-                    churn_status: customer.score === 1 ? "YES" : "NO",
-                    churn_factors: customer.cause
-                        ? customer.cause.split("\n")
-                        : [],
-                    solutions: customer.solution
-                        ? customer.solution.split("\n")
-                        : [],
-                    }
-                : null,
-            };
-        });
-
-        // 6. Kembalikan Response ke Postman / Frontend
-        res.status(200).json({
-            status: "success",
-            metadata: {
-            total_data: updatedData.totalData,
-            total_pages: updatedData.totalPages,
-            current_page: updatedData.currentPage,
-            page_size: limit,
-            },
-            data: resultPredict,
-        });
         } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            status: "error",
-            message: error.message,
-        });
+            console.log(error);
+            return res.status(500).json({
+                status: "error",
+                message: error.message,
+            });
         }
     }
 
     static async CustomerDetailController(req, res) {
         try {
-        const { id } = req.params;
-        const data = await CustomerModel.ShowCustomerByIdModel(id);
-        res.status(200).json({
-            status: "success",
-            data: {
-            message: data,
-            },
-        });
+            const { id } = req.params;
+            const data = await CustomerModel.ShowCustomerByIdModel(id);
+            res.status(200).json({
+                status: "success",
+                data: { message: data },
+            });
         } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            status: "error",
-            message: error.message,
-        });
+            console.log(error);
+            res.status(500).json({ status: "error", message: error.message });
         }
     }
 
     static async CustomerTypeController(req, res) {
         try {
-        const { type } = req.params;
-        const { page, limit } = req.query;
-
-        const data = await CustomerModel.FilterCustomerTypeModel(
-            type,
-            page,
-            limit
-        );
-        res.status(200).json({
-            status: "success",
-            metadata: {
-            total_data: data.totalData,
-            total_pages: data.totalPages,
-            current_page: data.currentPage,
-            page_size: limit,
-            },
-            data: data.customers,
-        });
+            const { type } = req.params;
+            const { page, limit } = req.query;
+            const data = await CustomerModel.FilterCustomerTypeModel(type, page, limit);
+            res.status(200).json({
+                status: "success",
+                metadata: {
+                    total_data: data.totalData,
+                    total_pages: data.totalPages,
+                    current_page: data.currentPage,
+                    page_size: limit,
+                },
+                data: data.customers,
+            });
         } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            status: "error",
-            message: error.message,
-        });
+            console.log(error);
+            res.status(500).json({ status: "error", message: error.message });
         }
     }
 
     static async CustomerSearchController(req, res) {
         try {
-        CustomerValidator.validateSearchPayload(req.query);
-
-        const { customer_id, page = 1, limit = 5 } = req.query;
-
-        const data = await CustomerModel.SearchCustomerbyCustomerIdModel(
-            customer_id,
-            page,
-            limit
-        );
-        res.status(200).json({
-            status: "success",
-            metadata: {
-            total_data: data.totalData,
-            total_pages: data.totalPages,
-            current_page: data.currentPage,
-            page_size: limit,
-            },
-            data: data.customers,
-        });
-        } catch (error) {
-        // Cek apakah ini error yang kita buat sendiri (400/401)
-        if (error instanceof ClientError) {
-            return res.status(error.statusCode).json({
-            status: "fail",
-            message: error.message,
+            CustomerValidator.validateSearchPayload(req.query);
+            const { customer_id, page = 1, limit = 5 } = req.query;
+            const data = await CustomerModel.SearchCustomerbyCustomerIdModel(customer_id, page, limit);
+            res.status(200).json({
+                status: "success",
+                metadata: {
+                    total_data: data.totalData,
+                    total_pages: data.totalPages,
+                    current_page: data.currentPage,
+                    page_size: limit,
+                },
+                data: data.customers,
             });
-        }
-
-        // Jika bukan (misal error database/server crash), kirim status 500
-        console.error(error); // Tetap log untuk internal
-        return res.status(500).json({
-            status: "error",
-            message: "Terjadi kegagalan pada server kami",
-        });
+        } catch (error) {
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({ status: "fail", message: error.message });
+            }
+            console.error(error);
+            return res.status(500).json({ status: "error", message: "Terjadi kegagalan pada server kami" });
         }
     }
 
     static async CustomerAddController(req, res) {
         try {
-        CustomerValidator.validateAddPayload(req.body);
-        const {
-            customer_id,
-            plan_id,
-            contract_id,
-            monthly_usage_hrs,
-            feature_adoption_pct,
-            payment_delay_count,
-            support_ticket_last_90d,
-            nps_score,
-            tenure_months,
-            last_login_days_ago,
-            monthly_revenue,
-            total_users,
-        } = req.body;
-        const data = await CustomerModel.AddCustomerModel(
-            customer_id,
-            plan_id,
-            contract_id,
-            monthly_usage_hrs,
-            feature_adoption_pct,
-            payment_delay_count,
-            support_ticket_last_90d,
-            nps_score,
-            tenure_months,
-            last_login_days_ago,
-            monthly_revenue,
-            total_users
-        );
-        res.status(200).json({
-            status: "success",
-            data: {
-            message: data,
-            },
-        });
-        } catch (error) {
-        // Cek apakah ini error yang kita buat sendiri (400/401)
-        if (error instanceof ClientError) {
-            return res.status(error.statusCode).json({
-            status: "fail",
-            message: error.message,
-            });
-        }
+            CustomerValidator.validateAddPayload(req.body);
+            const {
+                customer_id, plan_id, contract_id, monthly_usage_hrs,
+                feature_adoption_pct, payment_delay_count, support_ticket_last_90d,
+                nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users,
+            } = req.body;
+    
+            const newCustomer = await CustomerModel.AddCustomerModel(
+                customer_id, plan_id, contract_id, monthly_usage_hrs,
+                feature_adoption_pct, payment_delay_count, support_ticket_last_90d,
+                nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users
+            );
+    
+            const fullCustomerData = await CustomerModel.ShowCustomerByIdModel(newCustomer.id);
 
-        // Jika bukan (misal error database/server crash), kirim status 500
-        console.error(error); // Tetap log untuk internal
-        return res.status(500).json({
-            status: "error",
-            message: "Terjadi kegagalan pada server kami",
-        });
+            if (!fullCustomerData.plan_name) {
+                const plans = { 1: "Starter", 2: "Professional", 3: "Enterprise" };
+                fullCustomerData.plan_name = plans[plan_id] || "Starter";
+            }
+            if (!fullCustomerData.contract_name) {
+                const contracts = { 1: "Monthly", 2: "Annual" };
+                fullCustomerData.contract_name = contracts[contract_id] || "Monthly";
+            }
+
+            await CustomerController.#executeLivePrediction([fullCustomerData]);
+            const finalData = await CustomerModel.ShowCustomerByIdModel(newCustomer.id);
+    
+            return res.status(200).json({
+                status: "success",
+                message: "Customer baru berhasil ditambahkan dan langsung diprediksi oleh AI.",
+                data: finalData,
+            });
+        } catch (error) {
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({ status: "fail", message: error.message });
+            }
+            console.error(error);
+            return res.status(500).json({ status: "error", message: "Terjadi kegagalan pada server kami" });
         }
     }
 
     static async CustomerUploadFile(req, res) {
         try {
-        const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(worksheet);
+            const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const data = xlsx.utils.sheet_to_json(worksheet);
 
-        const formattedData = data.map((row, index) => {
-            // Mapping Plan Name ke ID
-            let planId;
-            const planName = row.plan_type ? row.plan_type.toLowerCase() : "";
-            if (planName === "starter") planId = 1;
-            else if (planName === "professional") planId = 2;
-            else if (planName === "enterprise") planId = 3;
-            else
-            throw new ClientError(
-                `Baris ${index + 2}: Plan '${row.plan_type}' tidak dikenal`
-            );
+            const formattedData = data.map((row, index) => {
+                let planId;
+                const planName = row.plan_type ? row.plan_type.toLowerCase() : "";
+                if (planName === "starter") planId = 1;
+                else if (planName === "professional") planId = 2;
+                else if (planName === "enterprise") planId = 3;
+                else throw new ClientError(`Baris ${index + 2}: Plan '${row.plan_type}' tidak dikenal`);
 
-            // Mapping Contract Name ke ID
-            let contractId;
-            const contractName = row.contract_type
-            ? row.contract_type.toLowerCase()
-            : "";
-            if (contractName === "monthly") contractId = 1;
-            else if (contractName === "annual") contractId = 2;
-            else
-            throw new ClientError(
-                `Baris ${index + 2}: Contract '${row.contract_type}' tidak dikenal`
-            );
+                let contractId;
+                const contractName = row.contract_type ? row.contract_type.toLowerCase() : "";
+                if (contractName === "monthly") contractId = 1;
+                else if (contractName === "annual") contractId = 2;
+                else throw new ClientError(`Baris ${index + 2}: Contract '${row.contract_type}' tidak dikenal`);
 
-            // Sesuaikan nama kolom Excel dengan nama properti yang diharapkan Joi/Model
-            return {
-            customer_id: row.customer_id,
-            plan_id: planId,
-            contract_id: contractId,
-            monthly_usage_hrs: parseFloat(row.monthly_usage_hrs),
-            feature_adoption_pct: parseFloat(row.feature_adoption_pct),
-            payment_delay_count: parseInt(row.payment_delay_count),
-            support_ticket_last_90d: parseInt(row.support_tickets_last_90d),
-            nps_score: parseInt(row.nps_score),
-            tenure_months: parseInt(row.tenure_months),
-            last_login_days_ago: parseInt(row.last_login_days_ago),
-            monthly_revenue: parseFloat(row.monthly_revenue),
-            total_users: parseInt(row.total_users),
-            };
-        });
+                return {
+                    customer_id: row.customer_id,
+                    plan_id: planId,
+                    contract_id: contractId,
+                    monthly_usage_hrs: parseFloat(row.monthly_usage_hrs),
+                    feature_adoption_pct: parseFloat(row.feature_adoption_pct),
+                    payment_delay_count: parseInt(row.payment_delay_count),
+                    support_ticket_last_90d: parseInt(row.support_ticket_last_90d),
+                    nps_score: parseInt(row.nps_score),
+                    tenure_months: parseInt(row.tenure_months),
+                    last_login_days_ago: parseInt(row.last_login_days_ago),
+                    monthly_revenue: parseFloat(row.monthly_revenue),
+                    total_users: parseInt(row.total_users),
+                };
+            });
 
-        formattedData.forEach((data, index) => {
-            CustomerValidator.validateAddPayload(data);
-        });
+            formattedData.forEach((data) => {
+                CustomerValidator.validateAddPayload(data);
+            });
 
-        const result = await CustomerModel.UploadExcellCustomerModel(
-            formattedData
-        );
-        res.status(200).json({
-            status: "success",
-            data: {
-            message: `${result.length} data customer berhasil diimpor dari Excel`,
-            },
-        });
+            const result = await CustomerModel.UploadExcellCustomerModel(formattedData);
+            res.status(200).json({
+                status: "success",
+                data: { message: `${result.length} data customer berhasil diimpor dari Excel` },
+            });
         } catch (error) {
-        // Gunakan helper handleError yang sudah kita buat sebelumnya
-        if (error instanceof ClientError) {
-            return res
-            .status(error.statusCode)
-            .json({ status: "fail", message: error.message });
-        }
-        console.error(error);
-        res
-            .status(500)
-            .json({ status: "error", message: "Gagal memproses file excel" });
+            if (error instanceof ClientError) {
+                return res.status(error.statusCode).json({ status: "fail", message: error.message });
+            }
+            console.error(error);
+            res.status(500).json({ status: "error", message: "Gagal memproses file excel" });
         }
     }
 
     static async StatsCustomerController(req, res) {
         try {
-        const data = await CustomerModel.StatsCustomerByTypeModel();
-        res.status(200).json({
-            status: "success",
-            data: {
-            message: data,
-            },
-        });
+            const data = await CustomerModel.StatsCustomerByTypeModel();
+            res.status(200).json({
+                status: "success",
+                data: { message: data },
+            });
         } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            status: "error",
-            message: error.message,
-        });
+            console.log(error);
+            res.status(500).json({ status: "error", message: error.message });
         }
     }
 
@@ -374,100 +243,132 @@ class CustomerController {
         try {
             const { risk } = req.params;
             const { page, limit } = req.query;
-
             const data = await CustomerModel.FilterCustomerRiskModel(risk, page, limit);
             res.status(200).json({
                 status: "success",
-                data: {
-                message: data,
-                },
+                data: { message: data },
             });
         } catch (error) {
             console.log(error);
-            res.status(500).json({
-                status: "error",
-                message: error.message,
-            });
+            res.status(500).json({ status: "error", message: error.message });
         }
     }
 
-    // coba predict manual
     static async PredictManual(req, res) {
         try {
-        const inputData = req.body;
+            const inputData = req.body;
 
-        // 1. Validasi Input
-        if (!inputData || Object.keys(inputData).length === 0) {
-            return res.status(400).json({
-            status: "error",
-            message: "Body request tidak boleh kosong",
-            });
-        }
-
-        const customerIdString = inputData.customer_id;
-
-        // 2. Panggil Helper untuk Mengeksekusi Python (Logika dipisahkan ke helper)
-        const result = await churnPredict(inputData);
-
-        // 3. Tangani Response Berdasarkan Status dari Python
-        if (result.status === "success") {
-            console.log("=== DEBUG PREDICT MANUAL ===");
-            console.log("Mencari Customer ID String:", customerIdString);
-
-            const customerDb = await CustomerModel.GetCustomerByStringIdModel(
-            customerIdString
-            );
-
-            console.log("Hasil pencarian customerDb di Postgres:", customerDb);
-            // ===================================
-
-            if (customerDb) {
-            console.log(
-                `[INFO] Customer ditemukan dengan ID Integer: ${customerDb.id}. Menyimpan ke tabel predicts...`
-            );
-            await PredictModel.SaveOrUpdatePredict(
-                customerDb.id,
-                result.risk_level,
-                result.score,
-                result.risk_score_pct,
-                result.churn_factors,
-                result.solutions
-            );
-            } else {
-            console.log(
-                `[WARN] Customer dengan ID string ${inputData.customer_id} tidak ditemukan di DB. Data tidak disimpan ke tabel predicts.`
-            );
+            if (!inputData || Object.keys(inputData).length === 0) {
+                return res.status(400).json({
+                    status: "error",
+                    message: "Body request tidak boleh kosong",
+                });
             }
 
-            return res.status(200).json({
-            status: "success",
-            message: "Prediksi berhasil dihitung oleh AI",
-            data: {
-                score: result.score,
-                risk_score_pct: result.risk_score_pct,
-                risk_level: result.risk_level,
-                churn_status: result.churn_status,
-                churn_factors: result.churn_factors,
-                solutions: result.solutions,
-            },
-            });
-        } else {
-            return res.status(500).json({
-            status: "error",
-            message: result.message || "Gagal mengeksekusi prediksi model",
-            titik_gagal: result.titik_gagal,
-            });
-        }
+            const customerIdString = inputData.customer_id;
+            const result = await churnPredict(inputData);
+
+            if (result.status === "success") {
+                console.log("=== DEBUG PREDICT MANUAL ===");
+                console.log("Mencari Customer ID String:", customerIdString);
+
+                const customerDb = await CustomerModel.GetCustomerByStringIdModel(customerIdString);
+                console.log("Hasil pencarian customerDb di Postgres:", customerDb);
+
+                if (customerDb) {
+                    console.log(`[INFO] Menyimpan ke tabel predicts untuk Customer ID: ${customerDb.customer_id}`);
+                    
+                    // FIXED: Kirim customerDb.id (Integer) agar selaras dengan #executeLivePrediction
+                    await PredictModel.SaveOrUpdatePredict(
+                        customerDb.id,
+                        result.risk_level,
+                        result.score,
+                        result.risk_score_pct,
+                        result.churn_factors,
+                        result.solutions
+                    );
+                } else {
+                    console.log(`[WARN] Customer dengan ID string ${inputData.customer_id} tidak ditemukan di DB.`);
+                }
+
+                return res.status(200).json({
+                    status: "success",
+                    message: "Prediksi berhasil dihitung oleh AI",
+                    data: {
+                        score: result.score,
+                        risk_score_pct: result.risk_score_pct,
+                        risk_level: result.risk_level,
+                        churn_status: result.churn_status,
+                        churn_factors: result.churn_factors,
+                        solutions: result.solutions,
+                    },
+                });
+            } else {
+                return res.status(500).json({
+                    status: "error",
+                    message: result.message || "Gagal mengeksekusi prediksi model",
+                    titik_gagal: result.titik_gagal,
+                });
+            }
         } catch (error) {
-        console.error("Error pada fungsi predictManual:", error.message);
-        return res.status(500).json({
-            status: "error",
-            message:
-            error.message || "Terjadi kesalahan pada internal server backend",
-        });
+            console.error("Error pada fungsi predictManual:", error.message);
+            return res.status(500).json({
+                status: "error",
+                message: error.message || "Terjadi kesalahan pada internal server backend",
+            });
         }
     }
 
+    static async StatsCustomerChurnController(req, res) {
+        try {
+            const data = await CustomerModel.StatsCustomerByChurnModel();
+            res.status(200).json({
+                status: "success",
+                data: { message: data },
+            });
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ status: "error", message: error.message });
+        }
+    }
+
+    static async StatsCustomerRiskController(req, res) {
+        try {
+            const rawData = await CustomerModel.GetStatsByRiskModel();
+            const summary = { low: 0, medium: 0, high: 0, unknown: 0 };
+            let totalCustomer = 0;
+
+            rawData.forEach(row => {
+                const level = row.risk_level.toLowerCase();
+                if (summary.hasOwnProperty(level)) {
+                    summary[level] = row.total_customer;
+                    totalCustomer += row.total_customer;
+                }
+            });
+
+            const percentage = {
+                low: totalCustomer > 0 ? `${Math.round((summary.low / totalCustomer) * 100)}%` : "0%",
+                medium: totalCustomer > 0 ? `${Math.round((summary.medium / totalCustomer) * 100)}%` : "0%",
+                high: totalCustomer > 0 ? `${Math.round((summary.high / totalCustomer) * 100)}%` : "0%",
+                unknown: totalCustomer > 0 ? `${Math.round((summary.unknown / totalCustomer) * 100)}%` : "0%"
+            };
+
+            return res.status(200).json({
+                status: "success",
+                data: {
+                    total_customer: totalCustomer,
+                    summary: summary,
+                    percentage: percentage
+                }
+            });
+
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ status: "error", message: error.message });
+        }
+    }
+
+    // --- CORE SINKRONISASI & ANTI-DUPLIKASI LIVE PREDICTION ---
     static async #executeLivePrediction(customers) {
         console.log(`[LIVE PREDICT] Memproses ${customers.length} data customer ke AI model...`);
         for (const customer of customers) {
@@ -490,7 +391,6 @@ class CustomerController {
                 const result = await churnPredict(inputData);
 
                 if (result.status === "success") {
-                    // 1. Simpan hasil prediksi AI seperti biasa
                     await PredictModel.SaveOrUpdatePredict(
                         customer.id, 
                         result.risk_level, 
@@ -500,10 +400,9 @@ class CustomerController {
                         result.solutions
                     );
                     
-                    // Pemicu Alert 1: Berdasarkan Hasil AI (Risk Level HIGH)
                     if (result.risk_level === "HIGH") {
                         await AlertModel.CreateAlertIfNotExist(
-                            customer.id,
+                            customer.id, // Gunakan String Kode ID
                             'High Churn Risk',
                             'high',
                             `Customer ${customer.customer_id} terdeteksi oleh AI memiliki risiko Churn yang TINGGI (${result.risk_score_pct}%).`,
@@ -511,10 +410,9 @@ class CustomerController {
                         );
                     }
 
-                    // Pemicu Alert 2: Berdasarkan Aturan Bisnis (Kritikal) - NPS Terlalu Rendah
                     if (parseInt(customer.nps_score) <= 3) {
                         await AlertModel.CreateAlertIfNotExist(
-                            customer.id,
+                            customer.id, // Gunakan String Kode ID
                             'Low NPS Score',
                             'medium',
                             `Customer ${customer.customer_id} memberikan nilai kepuasan (NPS) sangat rendah: ${customer.nps_score}.`,
@@ -522,10 +420,9 @@ class CustomerController {
                         );
                     }
 
-                    // Pemicu Alert 3: Masalah Administrasi - Sering Telat Bayar
                     if (parseInt(customer.payment_delay_count) >= 4) {
                         await AlertModel.CreateAlertIfNotExist(
-                            customer.id,
+                            customer.id, // Gunakan String Kode ID
                             'Late Payment Warning',
                             'medium',
                             `Customer ${customer.customer_id} sudah mendapati record telat bayar sebanyak ${customer.payment_delay_count} kali.`,
@@ -536,6 +433,65 @@ class CustomerController {
             } catch (loopError) {
                 console.error(`> Gagal memproses data live ${customer.customer_id}:`, loopError.message);
             }
+        }
+    }
+
+    static async CustomerPredictStreamController(req, res) {
+        try {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+
+            console.log("[SSE] Koneksi dimulai. Menarik seluruh data customer...");
+            
+            const allCustomers = await CustomerModel.GetAllCustomersModel();
+            const totalData = allCustomers.length;
+
+            if (totalData === 0) {
+                res.write(`data: ${JSON.stringify({ status: "empty", message: "Tidak ada data customer untuk diprediksi" })}\n\n`);
+                res.write('data: [DONE]\n\n');
+                return res.end();
+            }
+
+            for (let i = 0; i < totalData; i++) {
+                const customer = allCustomers[i];
+                const currentProgress = i + 1;
+                const percentage = Math.round((currentProgress / totalData) * 100);
+
+                try {
+                    await CustomerController.#executeLivePrediction([customer]); 
+
+                    const payload = {
+                        status: "processing",
+                        current: currentProgress,
+                        total: totalData,
+                        percentage: percentage,
+                        customer_code: customer.customer_id, 
+                        message: `Berhasil memproses ${customer.customer_id}`
+                    };
+
+                    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+
+                } catch (loopError) {
+                    console.error(`[SSE Error] Gagal memproses customer ID ${customer.id}:`, loopError.message);
+                    
+                    res.write(`data: ${JSON.stringify({
+                        status: "error_item",
+                        customer_code: customer.customer_id,
+                        message: `Gagal memproses ${customer.customer_id}: ${loopError.message}`
+                    })}\n\n`);
+                }
+            }
+
+            console.log("[SSE] Seluruh proses batch prediksi AI telah selesai.");
+            res.write('data: [DONE]\n\n');
+            res.end();
+
+        } catch (error) {
+            console.error("Error di [CustomerPredictStreamController]:", error.message);
+            res.write(`data: ${JSON.stringify({ status: "error", message: error.message })}\n\n`);
+            res.end();
         }
     }
 }
