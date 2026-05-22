@@ -11,11 +11,13 @@ const { customerRouter } = require("./CustomerRouter");
 const { userRouter } = require("./UserRouter");
 const { summarizeRouter } = require("./SummarizeRouter");
 const { alertRouter } = require("./AlertRouter");
+const { SentimentRouter } = require("./SentimentRouter"); 
 
 router.get("/", Controller.HomeController);
 router.use(userRouter);
 router.use(customerRouter);
 router.use('/summarize', summarizeRouter);
 router.use(alertRouter);
+router.use('/sentiment', SentimentRouter);
 
-module.exports = { router }; 
+module.exports = { router };
