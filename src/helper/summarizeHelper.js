@@ -6,7 +6,8 @@ const axios = require('axios');
 async function getSummarizeData() {
     try {
         // Memanggil API Flask di port 5000 (yang akan memproses CSV via Bi-LSTM)
-        const response = await axios.get('http://localhost:5000/summarize');
+        // const response = await axios.get('http://localhost:5000/summarize');
+        const response = await axios.get('http://localhost:5001/summarize');
         
         // Flask mengembalikan struktur: { percentage: {...}, summary: {...}, top5Comments: [...] }
         // Kita langsung kembalikan isinya ke Controller

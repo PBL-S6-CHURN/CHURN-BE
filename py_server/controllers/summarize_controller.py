@@ -275,10 +275,14 @@ def get_summarize_data() -> dict:
             try: thumbs_up = int(row.get('thumbsUpCount', 0))
             except ValueError: thumbs_up = 0
 
+            try: ratings = int(row.get('score', 0))
+            except ValueError: thumbs_up = 0
+
             rows.append({
                 'userName'     : row.get('userName', 'Pengguna') or 'Pengguna',
                 'userImage'    : row.get('userImage', None),
                 'content'      : content,
+                'rating'       : ratings,
                 'thumbsUpCount': thumbs_up,
                 'at'           : row.get('at', None),
                 'sentiment'    : None,
@@ -356,6 +360,7 @@ def get_summarize_data() -> dict:
         'userName'     : r['userName'],
         'userImage'    : r['userImage'],
         'content'      : r['content'],
+        'rating'       : r['rating'],
         'thumbsUpCount': r['thumbsUpCount'],
         'sentiment'    : r['sentiment'],
     } for r in all_sorted[:5]]

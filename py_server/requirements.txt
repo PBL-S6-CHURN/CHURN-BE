@@ -1,0 +1,14 @@
+# Library untuk API Server
+Flask
+Flask-Cors
+
+# Library untuk Backend Data & Churn Prediction
+numpy
+pandas
+scikit-learn
+joblib
+
+# Library untuk NLP (Sentiment Analysis)
+lime
+tensorflow==2.18.0
+tf-keras==2.18.0

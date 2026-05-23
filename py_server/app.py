@@ -16,4 +16,4 @@ app.register_blueprint(sentiment_bp, url_prefix='/sentiment')
 
 if __name__ == '__main__':
     print("Mulai menjalankan Server Python di port 5000...")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

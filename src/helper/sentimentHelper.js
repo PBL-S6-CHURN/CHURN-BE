@@ -5,7 +5,8 @@ const axios = require('axios');
 const checkSentimentToFlask = async (text) => {
     try {
         // Memanggil API Flask di port 5000
-        const response = await axios.post('http://localhost:5000/sentiment', { text });
+        const response = await axios.post('http://localhost:5001/sentiment', { text });
+        // const response = await axios.post('http://localhost:5000/sentiment', { text });
         const result = response.data.data;
 
         // --- PROSES HUMANISASI DATA ---
