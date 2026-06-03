@@ -112,11 +112,17 @@ class CustomerModel {
     // add customer
     static async AddCustomerModel(customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users) {
         try {
+            const exist = await this.CheckCustomerIdExist(customer_id);
+            if (exist) {
+                throw new NotFoundError(`Customer with id ${customer_id} already exist`)
+            };
+
             const textQuery = `INSERT INTO customers (customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`;
             const result = await query(textQuery, [customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users]); 
             return result.rows[0];
         } catch (error) {
             console.log(`Error [AddCustomerModel]: ${error.message}`);
+            throw error;
         }
     }
 
@@ -126,6 +132,11 @@ class CustomerModel {
             const result = [];
 
             for (const data of datas) {
+                const exist = await this.CheckCustomerIdExist(data.customer_id);
+                if (exist) {
+                    throw new NotFoundError(`Customer with id ${data.customer_id} already exist`)
+                };
+                
                 const textQuery = `
                     INSERT INTO customers (customer_id, plan_id, contract_id, monthly_usage_hrs, feature_adoption_pct, payment_delay_count, support_ticket_last_90d, nps_score, tenure_months, last_login_days_ago, monthly_revenue, total_users) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING customer_id;
                 `;
@@ -163,10 +174,10 @@ class CustomerModel {
                 WHERE p_pred.risk ILIKE $1 ORDER BY cu.customer_id ASC 
                 LIMIT $2 OFFSET $3
             `;
-            const countQuery = `SELECT COUNT(*) FROM customers`;
+            const countQuery = `SELECT COUNT(*) FROM customers cu LEFT JOIN predicts p_pred ON cu.id = p_pred.customer_id WHERE p_pred.risk ILIKE $1`;
             const [dataRes, countRes] = await Promise.all([
                 query(dataQuery, [risk, limit, offset]),
-                query(countQuery)
+                query(countQuery, [risk])
             ]);
             return {
                 customers: dataRes.rows,
@@ -188,10 +199,10 @@ class CustomerModel {
                 WHERE p.plan_name ILIKE $1 ORDER BY cu.customer_id ASC 
                 LIMIT $2 OFFSET $3
             `;
-            const countQuery = `SELECT COUNT(*) FROM customers`;
+            const countQuery = `SELECT COUNT(*) FROM customers cu LEFT JOIN plans p ON cu.plan_id = p.id WHERE p.plan_name ILIKE $1`;
             const [dataRes, countRes] = await Promise.all([
                 query(dataQuery, [type, limit, offset]),
-                query(countQuery)
+                query(countQuery, [type])
             ]);
             return {
                 customers: dataRes.rows,
@@ -364,6 +375,20 @@ class CustomerModel {
                 reject(new Error(`Python Crash seketika (Code ${code}). Log Windows: ${cleanError || 'Library pandas/joblib belum terinstal di terminal Windows Anda. Silakan jalankan: pip install pandas joblib scikit-learn'}`));
             });
         });
+    }
+
+    // check Customer
+    static async CheckCustomerIdExist(customer_id) {
+        try {
+            const textQuery = `
+                SELECT 1 FROM customers WHERE customer_id = $1
+            `;
+            const result = await query(textQuery, [customer_id]);
+            return result.rows[0];
+        } catch (error) {
+            console.error("Error [CheckCustomerIdExist]:", error.message);
+            throw error;
+        }
     }
 }
 

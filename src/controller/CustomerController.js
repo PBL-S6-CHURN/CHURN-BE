@@ -212,10 +212,23 @@ class CustomerController {
                 CustomerValidator.validateAddPayload(data);
             });
 
-            const result = await CustomerModel.UploadExcellCustomerModel(formattedData);
+            const totalDataAwal = formattedData.length;
+            const hasilInsert = await CustomerModel.UploadExcellCustomerModel(formattedData);
+            const jumlahBerhasil = hasilInsert.length;
+            const jumlahGagal = totalDataAwal - jumlahBerhasil;
+
+            if (jumlahBerhasil === 0) {
+                throw new ClientError("Tidak ada data customer yang berhasil diimpor.");
+            }
+            
             res.status(200).json({
                 status: "success",
-                data: { message: `${result.length} data customer berhasil diimpor dari Excel` },
+                message: "Data customer berhasil diimpor.",
+                data: { 
+                    total_data_awal: totalDataAwal,
+                    total_data_berhasil: jumlahBerhasil,
+                    total_data_gagal: jumlahGagal
+                },
             });
         } catch (error) {
             if (error instanceof ClientError) {
@@ -269,11 +282,8 @@ class CustomerController {
             const result = await churnPredict(inputData);
 
             if (result.status === "success") {
-                console.log("=== DEBUG PREDICT MANUAL ===");
-                console.log("Mencari Customer ID String:", customerIdString);
 
                 const customerDb = await CustomerModel.GetCustomerByStringIdModel(customerIdString);
-                console.log("Hasil pencarian customerDb di Postgres:", customerDb);
 
                 if (customerDb) {
                     console.log(`[INFO] Menyimpan ke tabel predicts untuk Customer ID: ${customerDb.customer_id}`);
@@ -373,6 +383,17 @@ class CustomerController {
         console.log(`[LIVE PREDICT] Memproses ${customers.length} data customer ke AI model...`);
         for (const customer of customers) {
             try {
+                const planMap = {
+                    1: "Starter",
+                    2: "Professional",
+                    3: "Enterprise"
+                }
+
+                const contractMap = {
+                    1: "Monthly",
+                    2: "Annual"
+                }
+
                 const inputData = {
                     customer_id: customer.customer_id,
                     monthly_usage_hrs: parseFloat(customer.monthly_usage_hrs),
@@ -381,8 +402,8 @@ class CustomerController {
                     tenure_months: parseInt(customer.tenure_months),
                     nps_score: parseInt(customer.nps_score),
                     payment_delay_count: parseInt(customer.payment_delay_count),
-                    plan_type: customer.plan_name, 
-                    contract_type: customer.contract_name,
+                    plan_type: planMap[customer.plan_id], 
+                    contract_type: contractMap[customer.contract_id],
                     monthly_revenue: parseFloat(customer.monthly_revenue),
                     total_users: parseInt(customer.total_users),
                     last_login_days_ago: parseInt(customer.last_login_days_ago)
