@@ -19,7 +19,7 @@ def predict_churn_logic(data_dict):
         # 1. Konversi data ke DataFrame
         df_raw = pd.DataFrame([data_dict])
         
-        # 2. Samakan Fitur (Sesuai kode predict.py Anda)
+        # 2. Samakan Fitur
         feature_names = [
             "total_users", 
             "monthly_usage_hrs", 
@@ -30,13 +30,11 @@ def predict_churn_logic(data_dict):
             "last_login_days_ago"
         ]
         
-        # Handling alias kolom
         if "support_ticket_last_90d" in df_raw.columns:
             df_raw["support_tickets_last_90d"] = df_raw["support_ticket_last_90d"]
         elif "support_tickets_count" in df_raw.columns:
             df_raw["support_tickets_last_90d"] = df_raw["support_tickets_count"]
 
-        # Fill missing & Type casting
         for col in feature_names:
             if col not in df_raw.columns:
                 df_raw[col] = 0
@@ -48,17 +46,19 @@ def predict_churn_logic(data_dict):
 
         df_filtered = df_raw[feature_names]
         
-        # 3. Eksekusi Model
-        prediction_raw = model.predict(df_filtered.values)[0]
-        prediction_result = int(prediction_raw)
+        # 3. Eksekusi Model dengan Probabilitas (Platt Scaling)
+        # predict_proba mengembalikan [probabilitas_0, probabilitas_1]
+        probabilities = model.predict_proba(df_filtered.values)[0]
+        churn_probability = probabilities[1] # Ambil probabilitas kelas 1 (Churn)
+        
+        # Hasil klasifikasi biner (threshold default 0.5)
+        prediction_result = 1 if churn_probability > 0.5 else 0
+        
+        # Konversi ke persentase untuk risk_score_pct
+        risk_score_pct = churn_probability * 100
 
-        # 4. Ambil variabel untuk hitung skor risiko (Logika Dinamis Anda)
-        tickets = int(df_filtered["support_tickets_last_90d"].iloc[0])
-        nps = int(df_filtered["nps_score"].iloc[0])
-        last_login = int(df_filtered["last_login_days_ago"].iloc[0])
-        usage = float(df_filtered["monthly_usage_hrs"].iloc[0])
-
-        # --- HITUNG SKOR RISIKO ---
+        # --- LOGIKA RULE BASED SEBELUMNYA DI-KOMEN ---
+        """
         if prediction_result == 1:
             churn_status = "YES"
             risk_level = "HIGH"
@@ -70,17 +70,25 @@ def predict_churn_logic(data_dict):
             if tickets > 5: stres_poin += 20
             if nps < 5: stres_poin += 20
             if last_login > 30: stres_poin += 15
-            
-            variasi = (tickets * 2) + (last_login // 10)
-            total_skor = stres_poin + variasi
-            if total_skor > 30:
-                risk_level = "MEDIUM"
-                risk_score_pct = max(31, min(total_skor, 65))
-            else:
-                risk_level = "LOW"
-                risk_score_pct = max(5, min(total_skor, 30))
+            ...
+        """
+        
+        # --- PENENTUAN RISK LEVEL BERDASARKAN PROBABILITAS MURNI ---
+        churn_status = "YES" if prediction_result == 1 else "NO"
+        
+        if risk_score_pct >= 70:
+            risk_level = "HIGH"
+        elif risk_score_pct >= 30:
+            risk_level = "MEDIUM"
+        else:
+            risk_level = "LOW"
 
-        # --- FAKTOR & SOLUSI ---
+        # --- FAKTOR & SOLUSI (Tetap dipertahankan agar informatif) ---
+        tickets = int(df_filtered["support_tickets_last_90d"].iloc[0])
+        nps = int(df_filtered["nps_score"].iloc[0])
+        last_login = int(df_filtered["last_login_days_ago"].iloc[0])
+        usage = float(df_filtered["monthly_usage_hrs"].iloc[0])
+
         churn_factors = []
         solutions = []
 
@@ -104,11 +112,12 @@ def predict_churn_logic(data_dict):
         return {
             "status": "success",
             "score": prediction_result,
-            "risk_score_pct": int(risk_score_pct),
+            "risk_score_pct": int(risk_score_pct), # Hasil dari Platt Scaling
             "risk_level": risk_level,
             "churn_status": churn_status,
             "churn_factors": churn_factors,
-            "solutions": solutions
+            "solutions": solutions,
+            "raw_probability": float(churn_probability) # Tambahan debug
         }
 
     except Exception as e:

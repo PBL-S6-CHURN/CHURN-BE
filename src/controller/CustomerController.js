@@ -12,7 +12,7 @@ class CustomerController {
 
     static async CustomerGetController(req, res) {
         try {
-            const { page = 1, limit = 5 } = req.query;
+            const { page = 1, limit = 10 } = req.query;
             const data = await CustomerModel.ShowAllCustomersModel(page, limit);
             const customers = data.customers;
 
@@ -107,7 +107,7 @@ class CustomerController {
     static async CustomerSearchController(req, res) {
         try {
             CustomerValidator.validateSearchPayload(req.query);
-            const { customer_id, page = 1, limit = 5 } = req.query;
+            const { customer_id, page = 1, limit = 10 } = req.query;
             const data = await CustomerModel.SearchCustomerbyCustomerIdModel(customer_id, page, limit);
             res.status(200).json({
                 status: "success",

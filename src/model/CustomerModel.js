@@ -64,7 +64,7 @@ class CustomerModel {
     }
 
     // show all customers
-    static async ShowAllCustomersModel(page=1, limit=5) {
+    static async ShowAllCustomersModel(page=1, limit=10) {
         try {
             const offset = (page - 1) * limit;
         
@@ -166,7 +166,7 @@ class CustomerModel {
     }
 
     // filter customer by risk
-    static async FilterCustomerRiskModel(risk, page=1, limit=5) {
+    static async FilterCustomerRiskModel(risk, page=1, limit=10) {
         try {
             const offset = (page - 1) * limit;
             const dataQuery = `
@@ -191,7 +191,7 @@ class CustomerModel {
         }
     }
     // filter customer by type
-    static async FilterCustomerTypeModel(type, page=1, limit=5) {
+    static async FilterCustomerTypeModel(type, page=1, limit=10) {
         try {
             const offset = (page - 1) * limit;
             const dataQuery = `
@@ -217,7 +217,7 @@ class CustomerModel {
     }
 
     // search customer by customer_id
-    static async SearchCustomerbyCustomerIdModel(cId, page=1, limit=5) {
+    static async SearchCustomerbyCustomerIdModel(cId, page=1, limit=10) {
         try {
             const offset = (page - 1) * limit;
             const searchPattern = `%${cId}%`;
