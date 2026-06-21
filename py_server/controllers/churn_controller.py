@@ -5,92 +5,72 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(BASE_DIR, 'ml_models', 'churn_prediction', 'churn_model.pkl')
 
-try: 
-    model = joblib.load(MODEL_PATH)
+try:
+    model_data        = joblib.load(MODEL_PATH)
+    pipeline          = model_data['pipeline']           # SVC probability=False → raw score
+    pipeline_proba    = model_data['pipeline_proba']     # SVC probability=True  → Platt %
+    expected_features = model_data['feature_names']
+    medium_threshold  = model_data['medium_threshold']   # -1.0259
+    high_threshold    = model_data['high_threshold']     # -0.1907
     print(f"Berhasil memuat model churn dari: {MODEL_PATH}")
-except FileNotFoundError:
-    raise FileNotFoundError(f"Model pkl tidak ditemukan di: {MODEL_PATH}")
+except Exception as e:
+    pipeline = pipeline_proba = None
+    print(f"Gagal memuat model: {e}")
+
 
 def predict_churn_logic(data_dict):
-    if model is None:
+    if pipeline is None:
         return {"status": "error", "message": "Model .pkl tidak ditemukan di server"}
 
     try:
         # 1. Konversi data ke DataFrame
         df_raw = pd.DataFrame([data_dict])
-        
-        # 2. Samakan Fitur
-        feature_names = [
-            "total_users", 
-            "monthly_usage_hrs", 
-            "feature_adoption_pct", 
-            "support_tickets_last_90d", 
-            "nps_score", 
-            "tenure_months", 
-            "last_login_days_ago"
-        ]
-        
+
+        # Penyesuaian nama kolom (jika frontend beda)
         if "support_ticket_last_90d" in df_raw.columns:
             df_raw["support_tickets_last_90d"] = df_raw["support_ticket_last_90d"]
         elif "support_tickets_count" in df_raw.columns:
             df_raw["support_tickets_last_90d"] = df_raw["support_tickets_count"]
 
-        for col in feature_names:
+        # 2. Lengkapi & urutkan fitur sesuai training
+        for col in expected_features:
             if col not in df_raw.columns:
-                df_raw[col] = 0
-            
-            if col in ["total_users", "support_tickets_last_90d", "nps_score", "tenure_months", "last_login_days_ago"]:
-                df_raw[col] = pd.to_numeric(df_raw[col], errors='coerce').fillna(0).astype(int)
-            else:
-                df_raw[col] = pd.to_numeric(df_raw[col], errors='coerce').fillna(0).astype(float)
+                df_raw[col] = 0.0
+        for col in expected_features:
+            df_raw[col] = pd.to_numeric(df_raw[col], errors='coerce').fillna(0)
 
-        df_filtered = df_raw[feature_names]
-        
-        # 3. Eksekusi Model dengan Probabilitas (Platt Scaling)
-        # predict_proba mengembalikan [probabilitas_0, probabilitas_1]
-        probabilities = model.predict_proba(df_filtered.values)[0]
-        churn_probability = probabilities[1] # Ambil probabilitas kelas 1 (Churn)
-        
-        # Hasil klasifikasi biner (threshold default 0.5)
-        prediction_result = 1 if churn_probability > 0.5 else 0
-        
-        # Konversi ke persentase untuk risk_score_pct
-        risk_score_pct = churn_probability * 100
+        df_filtered = df_raw[expected_features]
 
-        # --- LOGIKA RULE BASED SEBELUMNYA DI-KOMEN ---
-        """
-        if prediction_result == 1:
-            churn_status = "YES"
-            risk_level = "HIGH"
-            bonus_pinalti = (tickets * 2) + (last_login // 5) + (10 - nps)
-            risk_score_pct = min(66 + bonus_pinalti, 100)
-        else:
-            churn_status = "NO"
-            stres_poin = 0
-            if tickets > 5: stres_poin += 20
-            if nps < 5: stres_poin += 20
-            if last_login > 30: stres_poin += 15
-            ...
-        """
-        
-        # --- PENENTUAN RISK LEVEL BERDASARKAN PROBABILITAS MURNI ---
+        # 3a. RAW SCORE — jarak ke hyperplane SVM (bisa negatif / > 1)
+        #     Range aktual data: [-2.7750, 2.2254] — tidak ada clamping
+        raw_score = float(pipeline.decision_function(df_filtered)[0])
+
+        # 3b. PLATT PROBABILITY — probabilitas churn 0–100% (Platt Scaling)
+        #     Lebih mudah dibaca stakeholder
+        platt_pct = round(float(pipeline_proba.predict_proba(df_filtered)[0][1]) * 100, 2)
+
+        # 4. Binary prediction dari raw score (threshold SVM default = 0)
+        prediction_result = 1 if raw_score > 0 else 0
         churn_status = "YES" if prediction_result == 1 else "NO"
-        
-        if risk_score_pct >= 70:
+
+        # 5. Risk Level dari raw score (data-driven threshold dari PR Curve)
+        #    medium_threshold = -1.0259  (Recall >= 90%: early warning)
+        #    high_threshold   = -0.1907  (Recall >= 50%: sangat rawan)
+        if raw_score >= high_threshold:       # >= -0.1907
             risk_level = "HIGH"
-        elif risk_score_pct >= 30:
+        elif raw_score >= medium_threshold:   # >= -1.0259 dan < -0.1907
             risk_level = "MEDIUM"
-        else:
+        else:                                 # < -1.0259
             risk_level = "LOW"
 
-        # --- FAKTOR & SOLUSI (Tetap dipertahankan agar informatif) ---
-        tickets = int(df_filtered["support_tickets_last_90d"].iloc[0])
-        nps = int(df_filtered["nps_score"].iloc[0])
+        # 6. Faktor & Solusi
+        tickets    = int(df_filtered["support_tickets_last_90d"].iloc[0])
+        nps        = int(df_filtered["nps_score"].iloc[0])
         last_login = int(df_filtered["last_login_days_ago"].iloc[0])
-        usage = float(df_filtered["monthly_usage_hrs"].iloc[0])
+        usage      = float(df_filtered["monthly_usage_hrs"].iloc[0])
 
         churn_factors = []
-        solutions = []
+        solutions     = []
 
         if last_login > 30:
             churn_factors.append(f"Pelanggan tidak aktif (Login terakhir {last_login} hari yang lalu)")
@@ -110,14 +90,15 @@ def predict_churn_logic(data_dict):
             solutions.append("Tawarkan program loyalitas.")
 
         return {
-            "status": "success",
-            "score": prediction_result,
-            "risk_score_pct": int(risk_score_pct), # Hasil dari Platt Scaling
-            "risk_level": risk_level,
-            "churn_status": churn_status,
-            "churn_factors": churn_factors,
-            "solutions": solutions,
-            "raw_probability": float(churn_probability) # Tambahan debug
+            "status"          : "success",
+            "score"           : prediction_result,          # 0 atau 1
+            "risk_score_pct"  : round(raw_score, 4),        # raw SVM score (untuk Node.js)
+            "platt_score_pct" : platt_pct,                  # probabilitas churn 0–100%
+            "risk_level"      : risk_level,
+            "churn_status"    : churn_status,
+            "churn_factors"   : churn_factors,
+            "solutions"       : solutions,
+            "raw_probability" : round(raw_score, 4)         # alias raw_score (backward compat)
         }
 
     except Exception as e:
