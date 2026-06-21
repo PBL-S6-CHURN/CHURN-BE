@@ -1,7 +1,3 @@
-# Library untuk API Server
-Flask
-Flask-Cors
-
 # Library untuk Backend Data & Churn Prediction
 numpy
 pandas
