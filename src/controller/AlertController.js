@@ -45,6 +45,7 @@ class AlertController {
                 ai_prediction_analysis: alerts.ai_risk_level ? {
                     churn_score: alerts.ai_churn_score,
                     risk_score_pct: alerts.ai_risk_score_pct, // Skor dalam bentuk persen/probabilitas
+                    platt_score_pct: alerts.ai_platt_score_pct,
                     risk_level: alerts.ai_risk_level,
                     churn_status: alerts.ai_churn_score === 1 ? "YES" : "NO",
                     churn_factors: alerts.ai_churn_factors ? alerts.ai_churn_factors.split('\n') : [],

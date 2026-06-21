@@ -99,6 +99,7 @@ class AlertModel {
                     -- Data Analisis AI dari tabel predicts
                     pr.risk AS ai_risk_level,
                     pr.risk_score AS ai_risk_score_pct,
+                    pr.platt_score_pct AS ai_platt_score_pct,
                     pr.score AS ai_churn_score,
                     pr.cause AS ai_churn_factors,
                     pr.solution AS ai_solutions,
