@@ -1,6 +1,13 @@
 import joblib
 import pandas as pd
 import os
+import io
+import base64
+import psycopg2
+import matplotlib
+matplotlib.use('Agg') # Wajib agar server tidak crash saat membuat grafik di background
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(BASE_DIR, 'ml_models', 'churn_prediction', 'churn_model.pkl')
@@ -103,3 +110,72 @@ def predict_churn_logic(data_dict):
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+def get_churn_chart_from_db():
+    conn = None
+    try:
+        # 1. KONEKSI KE DATABASE POSTGRESQL
+        conn = psycopg2.connect(
+            host="localhost",
+            database="churn_prediction",  
+            user="postgres",                
+            password="admin",        
+            port="5432"
+        )
+        
+        # 2. QUERY DATA DARI TABEL PREDICTS
+        # Kita panggil kolom 'score' asli lalu diberi alias 'status'
+        query = "SELECT risk_score, platt_score_pct, score AS status FROM predicts;"
+        df = pd.read_sql_query(query, conn)
+        
+        if df.empty:
+            return {"status": "error", "message": "Data di database masih kosong."}
+
+        # ─── PEMETAAN ANGKA 0/1 MENJADI TEKS NO/YES UNTUK LEGENDA GRAFIK ───
+        df['status'] = df['status'].map({0: 'No', 1: 'Yes'})
+
+        # 3. PROSES PEMBUATAN GRAFIK (Density Plot / KDE Plot)
+        fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+        
+        # Grafik 1: Raw Score SVM
+        sns.kdeplot(data=df, x="risk_score", hue="status", fill=True, ax=axes[0], palette={"No": "blue", "Yes": "red"})
+        axes[0].axvline(x=0.0, color="black", linestyle="--", label="Boundary (0.0)")
+        axes[0].set_title("Raw Score SVM: Stay vs Churn")
+        axes[0].set_xlabel("Raw Score (decision_function)")
+        axes[0].set_ylabel("Density")
+        
+        # Grafik 2: Platt Probability (%)
+        if df["platt_score_pct"].max() <= 1.0:
+            df["platt_score_pct"] = df["platt_score_pct"] * 100
+        else:
+            df["platt_score_pct"] = df["platt_score_pct"]
+
+        sns.kdeplot(data=df, x="platt_score_pct", hue="status", fill=True, ax=axes[1], palette={"No": "blue", "Yes": "red"})
+        axes[1].axvline(x=50.0, color="black", linestyle="--", label="Boundary (50%)")
+        axes[1].set_title("Platt Probability (%): Stay vs Churn")
+        axes[1].set_xlabel("Churn Probability (%)")
+        axes[1].set_ylabel("Density")
+        
+        plt.tight_layout()
+
+        # 4. CONVERT GRAFIK MENJADI BASE64
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        
+        image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        
+        buf.close()
+        plt.close(fig)
+        
+        return {
+            "status": "success",
+            "image": f"data:image/png;base64,{image_base64}"
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+        
+    finally:
+        if conn is not None:
+            conn.close()

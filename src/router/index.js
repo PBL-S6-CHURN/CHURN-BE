@@ -12,12 +12,14 @@ const { userRouter } = require("./UserRouter");
 const { summarizeRouter } = require("./SummarizeRouter");
 const { alertRouter } = require("./AlertRouter");
 const { SentimentRouter } = require("./SentimentRouter"); 
+const { chartRouter } = require("./ChatRouter");
 
 router.get("/", Controller.HomeController);
 router.use(userRouter);
 router.use(customerRouter);
 router.use(summarizeRouter);
 router.use(alertRouter);
+router.use(chartRouter);
 router.use('/sentiment', SentimentRouter);
 
 module.exports = { router };
